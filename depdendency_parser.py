@@ -379,33 +379,55 @@ def log_reg_train (trees: List[DependencyTree], iterations: int, alpha: float) -
     return W
     
 
-# W = log_reg_train([x[0] for x in train], 5, 1.1)
-# np.savetxt("weights.gz", W, delimiter=",")
-W = np.loadtxt("weights.gz")
+W = log_reg_train([x[0] for x in train], 7, 1.2)
+np.savetxt("weights.gz", W, delimiter=",")
+#W = np.loadtxt("weights.gz", delimiter=",")
 
 example = DependencyTree()
 example.add_word("Book", "VB")
-example.add_word("me", "PRP")
 example.add_word("the", "DT")
-example.add_word("morning", "NN")
 example.add_word("flight", "NN")
-stack = [(0, ('ROOT', 'ROOT'))]
-words = example.get_words()
-while len(words) > 0 or len(stack) != 1:
-    features = np.append(extract_features(example, stack, words), 1)
-    y_hat = softmax(np.matmul(W, features))
-    pred = np.argmax(y_hat)
-    result = []
-    if pred == 0:
-        shift(words, stack)
-        result.append("SHIFT")
-    elif pred == 1:
-        left_arc(stack)
-        result.append("LEFT ARC")
-    elif pred == 2:
-        right_arc(stack)
-        result.append("RIGHT ARC")
+example.add_word("through", "IN")
+example.add_word("Houston", "NNP")
 
-print (y_hat)
-print (result)
-print (example.dependencies)
+def parse_to_tree (tree: DependencyTree, parse: List[str]):
+    words = tree.get_words()
+    stack = [(0, ('ROOT', 'ROOT'))]
+    for action in parse:
+        if action == "SHIFT":
+            shift(words, stack)
+        elif action == "LEFT ARC":
+            tree.add_dependency(stack[-1][0], stack[-2][0], None)
+            left_arc(stack)
+        else:
+            tree.add_dependency(stack[-2][0], stack[-1][0], None)
+            right_arc(stack)
+
+def create_dependencies(tree: DependencyTree):
+    stack = [(0, ('ROOT', 'ROOT'))]
+    words = tree.get_words()
+    result = []
+    while len(words) > 0 or len(stack) != 1:
+        features = np.append(extract_features(tree, stack, words), 1)
+        y_hat = softmax(np.matmul(W, features))
+        pred = np.argmax(y_hat)
+        if pred == 0:
+            shift(words, stack)
+            result.append("SHIFT")
+        elif pred == 1:
+            left_arc(stack)
+            result.append("LEFT ARC")
+        elif pred == 2:
+            right_arc(stack)
+            result.append("RIGHT ARC")
+    parse_to_tree(tree, result)
+    output = "HEAD\tDEPENDENT\n"
+    for i in tree.dependencies.keys():
+        if i != 0:
+            output+=tree.words[tree.dependencies[i][0]][0]
+            output+="\t"
+            output+=tree.words[i][0]
+            output+="\n"
+    return output
+
+print (create_dependencies(example))
